@@ -1,15 +1,20 @@
 package main
 
-import "github.com/gin-gonic/gin"
+import (
+	"log"
+	"github.com/joho/godotenv"
+	"github.com/mukesh1352/splitwise-backend/db"
+)
 
 func main() {
-	r := gin.Default()
+	// Load .env file (for local development)
+	if err := godotenv.Load(); err != nil {
+		log.Println("no .env file found, relying on environment variables")
+	}
 
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(200, gin.H{
-			"status": "ok",
-		})
-	})
+	database := db.Connect()
+	defer database.Close()
 
-	r.Run(":8080")
+	log.Println("application started successfully")
 }
+
