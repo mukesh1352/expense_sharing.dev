@@ -22,16 +22,15 @@ export interface SplitInput {
   percentage?: number;
 }
 
-export interface ExpenseInput {
+export type ExpenseInput = {
   expense_id: string;
   group_id: string;
   paid_by: string;
   total_amount: number;
-  split_type: SplitType;
+  split_type: "EQUAL" | "EXACT" | "PERCENT";
   participants: string[];
-  splits?: SplitInput[];
-  description?: string;
-}
+  splits: SplitInput[]; 
+};
 
 export interface SettlementInput {
   from_user_id: string;
