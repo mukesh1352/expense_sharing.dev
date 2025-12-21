@@ -9,6 +9,8 @@ type Props = {
 export default function CreateExpense({ onSuccess }: Props) {
   const [groups, setGroups] = useState<GroupView[]>([]);
   const [members, setMembers] = useState<UserView[]>([]);
+  const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const [expense, setExpense] = useState<ExpenseInput>({
     expense_id: crypto.randomUUID(),
@@ -20,22 +22,25 @@ export default function CreateExpense({ onSuccess }: Props) {
     splits: [],
   });
 
-  // Load groups ONCE
+  // Load groups once
   useEffect(() => {
     get<GroupView[]>("/groups").then(setGroups);
   }, []);
 
-  // Load members ONLY when group_id exists
+  // Load group members when group changes
   useEffect(() => {
-    if (!expense.group_id) return;
+    if (!expense.group_id) {
+      setMembers([]);
+      return;
+    }
 
-    get<UserView[]>(
-      `/groups/members?group_id=${expense.group_id}`
-    ).then(setMembers);
+    get<UserView[]>(`/groups/members?group_id=${expense.group_id}`)
+      .then(setMembers)
+      .catch(() => setError("Failed to load group members"));
   }, [expense.group_id]);
 
   const onGroupChange = (groupId: string) => {
-    setMembers([]); // safe here
+    setMembers([]);
     setExpense(prev => ({
       ...prev,
       group_id: groupId,
@@ -46,35 +51,54 @@ export default function CreateExpense({ onSuccess }: Props) {
   };
 
   const submit = async () => {
+    setError("");
+
     if (!expense.group_id) {
-      alert("Select a group");
+      setError("Please select a group");
       return;
     }
 
     if (!expense.paid_by) {
-      alert("Select who paid");
+      setError("Please select who paid");
       return;
     }
 
     if (expense.participants.length === 0) {
-      alert("Select at least one participant");
+      setError("Please select at least one participant");
       return;
     }
 
-    await post<void>("/expenses", expense);
-    alert("Expense created");
+    if (expense.total_amount <= 0) {
+      setError("Amount must be greater than 0");
+      return;
+    }
 
-    onSuccess();
+    try {
+      setLoading(true);
 
-    // Reset form (keep group)
-    setExpense(prev => ({
-      ...prev,
-      expense_id: crypto.randomUUID(),
-      total_amount: 0,
-      paid_by: "",
-      participants: [],
-      splits: [],
-    }));
+      await post<void>("/expenses", expense);
+
+      alert("Expense created successfully");
+      onSuccess();
+
+      // Reset form (keep group)
+      setExpense(prev => ({
+        ...prev,
+        expense_id: crypto.randomUUID(),
+        total_amount: 0,
+        paid_by: "",
+        participants: [],
+        splits: [],
+      }));
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError("Something went wrong");
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -140,7 +164,6 @@ export default function CreateExpense({ onSuccess }: Props) {
         </select>
       </div>
 
-      {/* Participants */}
       <h4>Participants</h4>
 
       {members.length === 0 && expense.group_id && (
@@ -165,7 +188,20 @@ export default function CreateExpense({ onSuccess }: Props) {
         </label>
       ))}
 
-      <button onClick={submit}>Create Expense</button>
+      {/* 🔥 Explicit button type prevents GET */}
+      <button
+        type="button"
+        onClick={submit}
+        disabled={loading}
+      >
+        {loading ? "Creating…" : "Create Expense"}
+      </button>
+
+      {error && (
+        <p style={{ color: "red", marginTop: "8px" }}>
+           {error}
+        </p>
+      )}
     </div>
   );
 }
