@@ -11,19 +11,21 @@ const (
 
 // SplitInput represents how much a single participant owes.
 type SplitInput struct {
-	UserID     string  
-	Amount     float64
-	Percentage float64 
+	UserID     string  `json:"user_id"`
+	Amount     float64 `json:"amount,omitempty"`
+	Percentage float64 `json:"percentage,omitempty"`
 }
+
 
 // ExpenseInput represents the input required to create an expense.
 type ExpenseInput struct {
-	ExpenseID    string   
-	GroupID      string    
-	PaidBy       string     
-	TotalAmount  float64    
-	SplitType    SplitType  
-	Participants []string  
-	Splits       []SplitInput 
-	Description  string     
+	ExpenseID    string     `json:"expense_id"`
+	GroupID      string     `json:"group_id"`
+	PaidBy       string     `json:"paid_by"`
+	TotalAmount  float64    `json:"total_amount"`
+	SplitType    SplitType  `json:"split_type"`
+	Participants []string   `json:"participants"`
+	Splits       []SplitInput `json:"splits,omitempty"`
+	Description  string     `json:"description,omitempty"`
 }
+

@@ -13,6 +13,20 @@ import (
 
 	"github.com/mukesh1352/splitwise-backend/ledger"
 )
+func enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type")
+
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		next.ServeHTTP(w, r)
+	})
+}
 
 func main() {
 	if err := godotenv.Load(); err != nil {
@@ -94,6 +108,41 @@ func main() {
 		})
 	})
 
+	// Get all users
+mux.HandleFunc("/users", func(w http.ResponseWriter, _ *http.Request) {
+	users, err := l.GetUsers()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(users)
+})
+
+// Get all groups
+mux.HandleFunc("/groups", func(w http.ResponseWriter, _ *http.Request) {
+	groups, err := l.GetGroups()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(groups)
+})
+
+// Get group members
+mux.HandleFunc("/groups/members", func(w http.ResponseWriter, r *http.Request) {
+	groupID := r.URL.Query().Get("group_id")
+	if groupID == "" {
+		http.Error(w, "group_id is required", http.StatusBadRequest)
+		return
+	}
+	users, err := l.GetGroupMembers(groupID)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	json.NewEncoder(w).Encode(users)
+})
+
 	// settling the balance
 	mux.HandleFunc("/settle", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodPost {
@@ -128,6 +177,7 @@ func main() {
 	if port == "" {
 		port = "8080"
 	}
+	log.Println("CONNECTED DATABASE =", dsn)
 	log.Println("Server running on.. : " + port)
-	log.Fatal(http.ListenAndServe(":"+port, mux))
+	log.Fatal(http.ListenAndServe(":"+port, enableCORS(mux)))
 }
