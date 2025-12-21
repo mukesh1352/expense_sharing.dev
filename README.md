@@ -565,3 +565,164 @@ Every time a new obligation is added, the system:
 | GET  | `/balances/groups`  | Get balances within a group          |
 | POST | `/expenses`         | Create a new expense                 |
 | POST | `/settle`           | Record a settlement                  |
+
+---
+
+## Running the Project Locally
+
+This project is designed as a **backend-first system** with a simple frontend
+for demonstration purposes. The backend and frontend are run as separate
+services.
+
+---
+
+### Prerequisites
+
+Ensure the following tools are installed:
+
+- Go **1.22+**
+- Node.js **18+**
+- PostgreSQL (or Supabase account)
+- Docker (optional, for containerized backend)
+
+---
+
+### Clone the Repository
+
+```bash
+git clone https://github.com/<your-username>/<your-repo-name>.git
+cd <your-repo-name>
+````
+
+---
+
+## Backend Setup
+
+### 1. Configure Environment Variables
+
+Create a `.env` file inside the `backend` directory:
+
+```env
+DATABASE_URL=postgresql://<username>:<password>@<host>:<port>/<database>?sslmode=require
+```
+
+> **Note:**
+> The backend expects an existing PostgreSQL database.
+> In development, Supabase is used as a managed PostgreSQL provider.
+
+---
+
+### 2. Apply Database Migrations
+
+Database schema is managed using SQL migration files located at:
+
+```
+backend/db/migrations
+```
+
+Migrations should be applied **manually** using a PostgreSQL client:
+
+```bash
+psql "$DATABASE_URL" -f backend/db/migrations/users.sql
+psql "$DATABASE_URL" -f backend/db/migrations/groups.sql
+psql "$DATABASE_URL" -f backend/db/migrations/group_members.sql
+psql "$DATABASE_URL" -f backend/db/migrations/expenses.sql
+psql "$DATABASE_URL" -f backend/db/migrations/expense_splits.sql
+psql "$DATABASE_URL" -f backend/db/migrations/balances.sql
+psql "$DATABASE_URL" -f backend/db/migrations/settlements.sql
+```
+
+---
+
+### 3. (Optional) Seed Sample Data
+
+To populate the database with sample users and groups:
+
+```bash
+psql "$DATABASE_URL" -f backend/db/seed.sql
+```
+
+---
+
+### 4. Run Backend Locally
+
+```bash
+cd backend
+go run main.go
+```
+
+The backend server will start on:
+
+```
+http://localhost:8080
+```
+
+---
+
+## Frontend Setup
+
+### 1. Install Dependencies
+
+```bash
+cd expense-sharing
+pnpm install
+```
+
+---
+
+### 2. Configure Frontend Environment Variables
+
+Create a `.env` file inside the `expense-sharing` directory:
+
+```env
+VITE_API_BASE=http://localhost:8080
+```
+
+---
+
+### 3. Run Frontend Locally
+
+```bash
+pnpm run dev
+```
+
+The frontend will be available at:
+
+```
+http://localhost:5173
+```
+
+---
+
+## Running with Docker (Optional)
+
+The backend can also be run using Docker.
+
+### Build and Run Backend Container
+
+```bash
+cd backend
+docker build -t expense-ledger .
+docker run -p 8080:8080 --env-file .env expense-ledger
+```
+
+---
+
+## Notes
+
+* Authentication and authorization are intentionally out of scope.
+* All financial state changes occur through database transactions.
+* The database acts as the single source of truth.
+* Frontend auto-refresh mechanisms are intentionally minimal to keep focus on
+  ledger correctness and system design.
+
+---
+
+## Key Focus of the Project
+
+This project prioritizes:
+
+* Ledger correctness over UI complexity
+* Strong consistency and transactional safety
+* Clear domain modeling
+* Simplified, net financial obligations
