@@ -32,7 +32,6 @@ The system applies **distributed system design principles** while maintaining
 a **centralized, strongly consistent ledger** for financial correctness.
 
 ---
-
 ## Tech Stack
 
 - **Backend**: Golang
@@ -52,6 +51,7 @@ a **centralized, strongly consistent ledger** for financial correctness.
   to focus on ledger correctness and balance management.
 
 ---
+
 
 ## Data Model Overview
 
@@ -106,20 +106,24 @@ serve distinct roles in tracking obligations and settlements.
 | `group_members`  | Validates user participation in a group     |
 
 ---
+```mermaid
+flowchart TD
+    UI[Frontend<br/>React] -->|REST API| API[Backend<br/>Golang]
 
-## Database Schema Management
-The database schema is managed using the SQL migration files which are located in the `backend/db/migrations` directory.
+    API -->|Transactions| DB[(PostgreSQL<br/>Supabase)]
 
-Each of the migration files defines a particular part of the database schema, such as the tables, its respective relations and the constraints required by the ledger system.
+    subgraph Ledger Logic
+        API --> E[Expense Creation]
+        API --> S[Split Calculation]
+        API --> B[Balance Netting]
+        API --> L[Ledger Simplification]
+        API --> T[Settlement Processing]
+    end
 
-Migrations are applied **outside of the application runtime** and are not
-executed by the backend service itself.
-This enures that :
- - The application does not modify the schema in production.
- - Schema changes are modified and auditable.
- - No race conditions occur.
- - For clear understanding of the data model and the architecture.
-
+    DB -->|Current State| Balances[balances table]
+    DB -->|History| Settlements[settlements table]
+```
+---
 ## Balance Model
 
 The system maintains a **directional balance ledger** where each entry
@@ -154,244 +158,6 @@ The following rules are always enforced:
 - Duplicate balances are not allowed
 
 ---
-
-## Expense Processing Flow
-
-When an expense is added, the system **does not move money**. Instead, it
-creates financial obligations between users.
-
-The general flow is:
-
-1. One user pays the full expense amount (the payer).
-2. Each participant owes a calculated share based on the selected split type.
-3. For each participant (excluding the payer), a balance is updated to reflect
-   that the participant owes the payer their share.
-4. Balances are netted and simplified to remove redundant obligations.
-5. All operations occur within a **single database transaction**.
-
----
-
-## Supported Split Types
-
-### Equal Split
-The total expense amount is divided equally among all participants.
-
-### Exact Amount Split
-Each participant owes a specific amount.
-
-```
-
-sum(participant_shares) = total_amount
-
-```
-
-### Percentage Split
-Each participant owes a percentage of the total expense.
-
-```
-
-sum(percentages) = 100%
-
-```
-
----
-
-## Balance Netting and Simplification
-
-The system stores balances as **net financial obligations** to keep the ledger
-minimal and easy to understand.
-
-### Balance Netting
-
-If two users owe each other, the system nets the balances so that only the
-difference is stored.
-
-**Example:**
-
-- User A owes User B ₹100
-- User B owes User A ₹60
-
-After netting:
-
-- User A owes User B ₹40
-
-This avoids redundant or contradictory debts.
-
----
-
-### Balance Simplification
-
-Beyond pairwise netting, the system also simplifies **multi-party debts**.
-
-If:
-- User A owes User B
-- User B owes User C
-
-Then the system simplifies this into a **direct obligation from User A to
-User C**, wherever possible.
-
-**Example:**
-
-- User A → User B = ₹100  
-- User B → User C = ₹100  
-
-Simplified to:
-
-- User A → User C = ₹100  
-
-This minimizes the number of outstanding balances and reduces the number of
-payments required to settle all dues, while preserving the correct net outcome.
-
----
-
-## Settlements
-
-Settlements represent the fulfillment of an obligation **outside the system**,
-such as through cash, bank transfer, or UPI.
-
-When a settlement is recorded:
-
-- The corresponding balance is reduced or removed
-- Fully settled balances are deleted from the ledger
-
-All settlements are stored as **immutable records** to provide an auditable
-history of payments, while balances always reflect the **current outstanding
-obligations**.
-
----
-## Core Backend Functions and Responsibilities
-
-The backend follows a **ledger-centric design**, where all financial state
-changes are performed through a small set of well-defined, transactional
-functions. Each function has a single responsibility and preserves ledger
-correctness at all times.
-
----
-
-### Transaction Management
-
-#### `withTx(fn)`
-
-Executes a sequence of database operations within a single transaction.
-
-**Responsibilities:**
-- Begins a database transaction
-- Commits on success
-- Rolls back automatically on error
-- Helps in the denial of the race condition by using the rollback and commit protocols.
-
-**Why it exists:**
-All financial operations must be **atomic**. Partial updates could corrupt
-balances and violate ledger invariants.
-
----
-
-### Expense Creation
-
-#### `CreateExpense(ctx, input)`
-
-Creates a new expense and updates the ledger accordingly.
-
-**Executed inside one transaction.**
-
-**Responsibilities:**
-1. Validates expense input
-2. Inserts the expense record
-3. Calculates how much each participant owes
-4. Inserts `expense_splits`
-5. Updates balances using ledger core logic
-6. Commits atomically
-
-
----
-
-### Split Calculation
-
-#### `calculateShares(input)`
-
-Determines how the total expense amount is divided among participants.
-
-Delegates to one of the following based on `split_type`:
-
-- `calculateEqualSplit`
-- `calculateExactSplit`
-- `calculatePercentageSplit`
-
-These functions are **pure business logic** and do not interact with the database.
-
----
-
-### Balance Updates
-
-#### `applyBalanceDelta(tx, fromUser, toUser, amount)`
-
-Applies a single financial obligation to the ledger.
-
-**Responsibilities:**
-- Prevents self-debt
-- Enforces positive balances
-- Detects reverse balances
-- Performs netting when required
-- Ensures only one directional balance exists between users
-
-This function is the **core of ledger correctness**.
-
----
-
-### Balance Simplification
-
-#### `SimplifyUserBalances(tx, userID)`
-
-Simplifies balances involving a specific user by collapsing indirect obligations.
-
-**Example:**
-- A owes B
-- B owes C  
-→ simplified to  
-- A owes C
-
----
-
-#### `SimplifyBalances(tx)`
-
-Runs balance simplification across all users to keep the ledger minimal and
-efficient after expense creation.
-
----
-
-### Settlement Processing
-
-#### `SettleBalance(ctx, fromUser, toUser, amount)`
-
-Records a real-world payment and updates the ledger.
-
-**Responsibilities:**
-- Validates settlement amount
-- Inserts an immutable settlement record
-- Reduces or removes the corresponding balance
-
-Settlements represent payments **outside the system** (cash, bank transfer, UPI).
-
----
-
-### Read Operations
-
-#### `GetBalancesForUser(userID)`
-
-Returns all balances where the user is either:
-- Owing money, or
-- Being owed money
-
-Used to display:
-- “You owe”
-- “You are owed”
-
----
-
-#### `GetGroupBalances(groupID)`
-
-Returns all balances between members of a specific group.
-
 
 ## Balance Direction, Netting, and Ledger Terminology
 
@@ -548,7 +314,6 @@ These invariants guarantee that the ledger remains minimal, consistent, and
 financially correct.
 
 ---
-
 ### Key Takeaway
 
 Every time a new obligation is added, the system:
@@ -556,6 +321,256 @@ Every time a new obligation is added, the system:
 1. Cancels any existing obligation in the opposite direction
 2. Applies only the remaining net amount
 3. Ensures the ledger reflects the true financial state
+---
+## Expense Processing Flow
+
+When an expense is added, the system **does not move money**. Instead, it
+creates financial obligations between users.
+
+The general flow is:
+
+1. One user pays the full expense amount (the payer).
+2. Each participant owes a calculated share based on the selected split type.
+3. For each participant (excluding the payer), a balance is updated to reflect
+   that the participant owes the payer their share.
+4. Balances are netted and simplified to remove redundant obligations.
+5. All operations occur within a **single database transaction**.
+
+---
+
+## Supported Split Types
+
+### Equal Split
+The total expense amount is divided equally among all participants.
+
+### Exact Amount Split
+Each participant owes a specific amount.
+
+```
+
+sum(participant_shares) = total_amount
+
+```
+
+### Percentage Split
+Each participant owes a percentage of the total expense.
+
+```
+
+sum(percentages) = 100%
+
+```
+
+---
+
+## Balance Netting and Simplification
+
+The system stores balances as **net financial obligations** to keep the ledger
+minimal and easy to understand.
+
+### Balance Netting
+
+If two users owe each other, the system nets the balances so that only the
+difference is stored.
+
+**Example:**
+
+- User A owes User B ₹100
+- User B owes User A ₹60
+
+After netting:
+
+- User A owes User B ₹40
+
+This avoids redundant or contradictory debts.
+
+---
+
+### Balance Simplification
+
+Beyond pairwise netting, the system also simplifies **multi-party debts**.
+
+If:
+- User A owes User B
+- User B owes User C
+
+Then the system simplifies this into a **direct obligation from User A to
+User C**, wherever possible.
+
+**Example:**
+
+- User A → User B = ₹100  
+- User B → User C = ₹100  
+
+Simplified to:
+
+- User A → User C = ₹100  
+
+This minimizes the number of outstanding balances and reduces the number of
+payments required to settle all dues, while preserving the correct net outcome.
+
+---
+## Settlements
+
+Settlements represent the fulfillment of an obligation **outside the system**,
+such as through cash, bank transfer, or UPI.
+
+When a settlement is recorded:
+
+- The corresponding balance is reduced or removed
+- Fully settled balances are deleted from the ledger
+
+All settlements are stored as **immutable records** to provide an auditable
+history of payments, while balances always reflect the **current outstanding
+obligations**.
+
+
+## Database Schema Management
+The database schema is managed using the SQL migration files which are located in the `backend/db/migrations` directory.
+
+Each of the migration files defines a particular part of the database schema, such as the tables, its respective relations and the constraints required by the ledger system.
+
+Migrations are applied **outside of the application runtime** and are not
+executed by the backend service itself.
+This enures that :
+ - The application does not modify the schema in production.
+ - Schema changes are modified and auditable.
+ - No race conditions occur.
+ - For clear understanding of the data model and the architecture.
+
+
+## Core Backend Functions and Responsibilities
+
+The backend follows a **ledger-centric design**, where all financial state
+changes are performed through a small set of well-defined, transactional
+functions. Each function has a single responsibility and preserves ledger
+correctness at all times.
+
+---
+
+### Transaction Management
+
+#### `withTx(fn)`
+
+Executes a sequence of database operations within a single transaction.
+
+**Responsibilities:**
+- Begins a database transaction
+- Commits on success
+- Rolls back automatically on error
+- Helps in the denial of the race condition by using the rollback and commit protocols.
+
+**Why it exists:**
+All financial operations must be **atomic**. Partial updates could corrupt
+balances and violate ledger invariants.
+
+---
+
+### Expense Creation
+
+#### `CreateExpense(ctx, input)`
+
+Creates a new expense and updates the ledger accordingly.
+
+**Executed inside one transaction.**
+
+**Responsibilities:**
+1. Validates expense input
+2. Inserts the expense record
+3. Calculates how much each participant owes
+4. Inserts `expense_splits`
+5. Updates balances using ledger core logic
+6. Commits atomically
+
+
+---
+
+### Split Calculation
+
+#### `calculateShares(input)`
+
+Determines how the total expense amount is divided among participants.
+
+Delegates to one of the following based on `split_type`:
+
+- `calculateEqualSplit`
+- `calculateExactSplit`
+- `calculatePercentageSplit`
+
+These functions are **pure business logic** and do not interact with the database.
+
+---
+
+### Balance Updates
+
+#### `applyBalanceDelta(tx, fromUser, toUser, amount)`
+
+Applies a single financial obligation to the ledger.
+
+**Responsibilities:**
+- Prevents self-debt
+- Enforces positive balances
+- Detects reverse balances
+- Performs netting when required
+- Ensures only one directional balance exists between users
+
+This function is the **core of ledger correctness**.
+
+---
+
+### Balance Simplification
+
+#### `SimplifyUserBalances(tx, userID)`
+
+Simplifies balances involving a specific user by collapsing indirect obligations.
+
+**Example:**
+- A owes B
+- B owes C  
+→ simplified to  
+- A owes C
+
+---
+
+#### `SimplifyBalances(tx)`
+
+Runs balance simplification across all users to keep the ledger minimal and
+efficient after expense creation.
+
+---
+
+### Settlement Processing
+
+#### `SettleBalance(ctx, fromUser, toUser, amount)`
+
+Records a real-world payment and updates the ledger.
+
+**Responsibilities:**
+- Validates settlement amount
+- Inserts an immutable settlement record
+- Reduces or removes the corresponding balance
+
+Settlements represent payments **outside the system** (cash, bank transfer, UPI).
+
+---
+
+### Read Operations
+
+#### `GetBalancesForUser(userID)`
+
+Returns all balances where the user is either:
+- Owing money, or
+- Being owed money
+
+Used to display:
+- “You owe”
+- “You are owed”
+
+---
+
+#### `GetGroupBalances(groupID)`
+
+Returns all balances between members of a specific group.
 
 ## API Overview
 
