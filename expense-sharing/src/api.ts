@@ -1,13 +1,4 @@
-// Resolve API base URL for both local and production
-const API_BASE =
-  import.meta.env.VITE_API_BASE ??
-  "http://localhost:8080";
-
-if (!API_BASE) {
-  throw new Error(
-    "VITE_API_BASE is not defined. Set it in .env or Vercel environment variables."
-  );
-}
+const API_BASE = import.meta.env.VITE_API_BASE as string;
 
 async function handle<T>(res: Response): Promise<T> {
   if (!res.ok) {
