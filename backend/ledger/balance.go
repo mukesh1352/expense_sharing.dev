@@ -5,14 +5,6 @@ import (
 	"errors"
 )
 
-// applyBalanceDelta applies a single obligation:
-// fromUserID owes toUserID amount.
-//
-// Ledger invariants enforced:
-// - No self-debt
-// - No negative balances
-// - No bidirectional balances
-// - Net obligations only
 func applyBalanceDelta(
 	tx *sql.Tx,
 	fromUserID string,
