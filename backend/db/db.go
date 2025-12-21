@@ -1,32 +1,24 @@
-package db
+package main
 
 import (
-	"database/sql"
+	"context"
 	"log"
 	"os"
-	"time"
-
-	_ "github.com/jackc/pgx/v5/stdlib"
+	"github.com/jackc/pgx/v5"
 )
 
-func Connect() *sql.DB{
-	data_url := os.Getenv("DATABASE_URL")
-	if data_url == ""{
-		log.Fatal("DATABASE_URL is not set..")
+func main() {
+	conn, err := pgx.Connect(context.Background(), os.Getenv("DATABASE_URL"))
+	if err != nil {
+		log.Fatalf("Failed to connect to the database: %v", err)
 	}
-	db,err := sql.Open("pgx",data_url)
-	if err != nil{
-		log.Fatalf("Failed to open database: %v",err)
-	}
-	/*---- The time limits -----*/
-	db.SetMaxOpenConns(25)
-	db.SetMaxIdleConns(10)
-	db.SetConnMaxLifetime(30*time.Minute)
+	defer conn.Close(context.Background())
 
-	if err := db.Ping();
-  err!=nil{
-		log.Fatalf("Failed to ping to the server ... : %v",err)
+	// Example query to test connection
+	var version string
+	if err := conn.QueryRow(context.Background(), "SELECT version()").Scan(&version); err != nil {
+		log.Fatalf("Query failed: %v", err)
 	}
-	log.Println("databse connection is successful ... ")
-	return db
+
+	log.Println("Connected to:", version)
 }

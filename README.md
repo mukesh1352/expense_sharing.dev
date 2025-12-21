@@ -31,7 +31,7 @@ a **centralized, strongly consistent ledger** for financial correctness.
 ## Tech Stack
 
 - **Backend**: Golang
-- **Database**: PostgreSQL (NEON)
+- **Database**: PostgreSQL (Supabase)
 - **Frontend**: React
 - **API Style**: REST
 
@@ -40,7 +40,7 @@ a **centralized, strongly consistent ledger** for financial correctness.
 ## Design Choices
 
 - **PostgreSQL** is used to provide strong consistency and transactional
-  guarantees, which are essential for financial data. **Neon** is preffered in this project.
+  guarantees, which are essential for financial data. **Supabase** is used as the managed PostgreSQL provider for reliability and always-on availability during development.
 - The backend is designed as a **stateless service**, with the database acting
   as the **single source of truth**.
 - Authentication and payment processing are intentionally kept **out of scope**
@@ -241,3 +241,310 @@ history of payments, while balances always reflect the **current outstanding
 obligations**.
 
 ---
+## Core Backend Functions and Responsibilities
+
+The backend follows a **ledger-centric design**, where all financial state
+changes are performed through a small set of well-defined, transactional
+functions. Each function has a single responsibility and preserves ledger
+correctness at all times.
+
+---
+
+### Transaction Management
+
+#### `withTx(fn)`
+
+Executes a sequence of database operations within a single transaction.
+
+**Responsibilities:**
+- Begins a database transaction
+- Commits on success
+- Rolls back automatically on error
+
+**Why it exists:**
+All financial operations must be **atomic**. Partial updates could corrupt
+balances and violate ledger invariants.
+
+---
+
+### Expense Creation
+
+#### `CreateExpense(ctx, input)`
+
+Creates a new expense and updates the ledger accordingly.
+
+**Executed inside one transaction.**
+
+**Responsibilities:**
+1. Validates expense input
+2. Inserts the expense record
+3. Calculates how much each participant owes
+4. Inserts `expense_splits`
+5. Updates balances using ledger core logic
+6. Commits atomically
+
+**Important Note:**
+This function does not move money. It only creates **financial obligations**.
+
+---
+
+### Split Calculation
+
+#### `calculateShares(input)`
+
+Determines how the total expense amount is divided among participants.
+
+Delegates to one of the following based on `split_type`:
+
+- `calculateEqualSplit`
+- `calculateExactSplit`
+- `calculatePercentageSplit`
+
+These functions are **pure business logic** and do not interact with the database.
+
+---
+
+### Balance Updates
+
+#### `applyBalanceDelta(tx, fromUser, toUser, amount)`
+
+Applies a single financial obligation to the ledger.
+
+**Responsibilities:**
+- Prevents self-debt
+- Enforces positive balances
+- Detects reverse balances
+- Performs netting when required
+- Ensures only one directional balance exists between users
+
+This function is the **core of ledger correctness**.
+
+---
+
+### Balance Simplification
+
+#### `SimplifyUserBalances(tx, userID)`
+
+Simplifies balances involving a specific user by collapsing indirect obligations.
+
+**Example:**
+- A owes B
+- B owes C  
+→ simplified to  
+- A owes C
+
+---
+
+#### `SimplifyBalances(tx)`
+
+Runs balance simplification across all users to keep the ledger minimal and
+efficient after expense creation.
+
+---
+
+### Settlement Processing
+
+#### `SettleBalance(ctx, fromUser, toUser, amount)`
+
+Records a real-world payment and updates the ledger.
+
+**Responsibilities:**
+- Validates settlement amount
+- Inserts an immutable settlement record
+- Reduces or removes the corresponding balance
+
+Settlements represent payments **outside the system** (cash, bank transfer, UPI).
+
+---
+
+### Read Operations
+
+#### `GetBalancesForUser(userID)`
+
+Returns all balances where the user is either:
+- Owing money, or
+- Being owed money
+
+Used to display:
+- “You owe”
+- “You are owed”
+
+---
+
+#### `GetGroupBalances(groupID)`
+
+Returns all balances between members of a specific group.
+
+
+## Balance Direction, Netting, and Ledger Terminology
+
+The system maintains balances as **directional financial obligations** between users.
+Each balance represents a net amount that one user owes another.
+
+A balance entry is stored as:
+
+from_user_id → to_user_id = amount
+
+This means that `from_user_id` owes `to_user_id` the specified amount.
+
+---
+
+### Forward Balance
+
+A **forward balance** exists when a new obligation is applied in the same direction
+as an existing balance.
+
+**Example:**
+
+Existing balance:
+```
+
+Bob → Alice = 30
+
+```
+
+New obligation:
+```
+
+Bob → Alice = 50
+
+```
+
+Resulting balance:
+```
+
+Bob → Alice = 80
+
+```
+
+In this case, the amounts are simply added because the direction is the same.
+
+---
+
+### Reverse Balance
+
+A **reverse balance** exists when a new obligation is applied in the opposite direction
+of an existing balance.
+
+**Example:**
+
+Existing balance:
+```
+
+Alice → Bob = 30
+
+```
+
+New obligation:
+```
+
+Bob → Alice = 50
+
+```
+
+These balances represent opposite obligations and must be **netted** to avoid
+redundant or contradictory debts.
+
+---
+
+### Balance Netting
+
+**Netting** is the process of canceling out obligations in opposite directions and
+keeping only the net amount.
+
+#### Case 1: Reverse balance is greater
+```
+
+Alice → Bob = 100
+Bob → Alice = 40
+
+```
+
+Net result:
+```
+
+Alice → Bob = 60
+
+```
+
+#### Case 2: Reverse balance is smaller
+```
+
+Alice → Bob = 30
+Bob → Alice = 80
+
+```
+
+Net result:
+```
+
+Bob → Alice = 50
+
+```
+
+#### Case 3: Reverse balance is equal
+```
+
+Alice → Bob = 50
+Bob → Alice = 50
+
+```
+
+Net result:
+```
+
+(no balance exists)
+
+```
+
+Zero balances are removed from the ledger, as they represent no outstanding
+obligation.
+
+---
+
+### Why Reverse Balances Are Always Checked First
+
+When applying a new obligation, the system always checks for a **reverse balance**
+before updating a forward balance.
+
+This ensures:
+- Only one balance exists between any two users
+- The ledger stores net obligations only
+- Circular or duplicate debts are prevented
+
+Allowing both directions to exist would make it impossible to clearly determine
+how much a user actually owes.
+
+---
+
+### Ledger Invariants Enforced
+
+At all times, the ledger enforces the following rules:
+
+- Balances are always positive
+- A user never owes themselves
+- Only one directional balance exists between any two users
+- Reverse balances are netted before forward balances are created or updated
+- Zero-value balances are removed
+
+These invariants guarantee that the ledger remains minimal, consistent, and
+financially correct.
+
+---
+
+### Key Takeaway
+
+Every time a new obligation is added, the system:
+
+1. Cancels any existing obligation in the opposite direction
+2. Applies only the remaining net amount
+3. Ensures the ledger reflects the true financial state
+
+## API Overview
+
+| Method | Endpoint            | Description                          |
+|------|---------------------|--------------------------------------|
+| GET  | `/balances/user`    | Get balances for a user              |
+| GET  | `/balances/groups`  | Get balances within a group          |
+| POST | `/expenses`         | Create a new expense                 |
+| POST | `/settle`           | Record a settlement                  |
