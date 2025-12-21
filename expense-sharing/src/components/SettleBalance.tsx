@@ -20,35 +20,17 @@ export default function SettleBalance({ onSuccess }: Props) {
   }, []);
 
   const submit = async () => {
-    setError("");
-
-    if (!data.from_user_id || !data.to_user_id) {
-      setError("Please select both users");
-      return;
-    }
-
-    if (data.from_user_id === data.to_user_id) {
-      setError("Cannot settle balance with the same user");
-      return;
-    }
-
-    if (data.amount <= 0) {
-      setError("Amount must be greater than 0");
-      return;
-    }
-
     try {
+      if (!data.from_user_id || !data.to_user_id || data.amount <= 0) {
+        setError("Invalid settlement input");
+        return;
+      }
+
       await post<void>("/settle", data);
 
+      setError("");
       alert("Settlement successful");
       onSuccess();
-
-      // Reset form after success
-      setData({
-        from_user_id: "",
-        to_user_id: "",
-        amount: 0,
-      });
     } catch (err) {
       if (err instanceof Error) {
         setError(err.message);
@@ -62,53 +44,43 @@ export default function SettleBalance({ onSuccess }: Props) {
     <div className="section">
       <h2>Settle Balance</h2>
 
-      <div className="form-row">
-        <select
-          value={data.from_user_id}
-          onChange={e =>
-            setData(prev => ({ ...prev, from_user_id: e.target.value }))
-          }
-        >
-          <option value="">From</option>
-          {users.map(u => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-        </select>
+      <select
+        value={data.from_user_id}
+        onChange={e =>
+          setData({ ...data, from_user_id: e.target.value })
+        }
+      >
+        <option value="">From</option>
+        {users.map(u => (
+          <option key={u.id} value={u.id}>{u.name}</option>
+        ))}
+      </select>
 
-        <select
-          value={data.to_user_id}
-          onChange={e =>
-            setData(prev => ({ ...prev, to_user_id: e.target.value }))
-          }
-        >
-          <option value="">To</option>
-          {users.map(u => (
-            <option key={u.id} value={u.id}>
-              {u.name}
-            </option>
-          ))}
-        </select>
+      <select
+        value={data.to_user_id}
+        onChange={e =>
+          setData({ ...data, to_user_id: e.target.value })
+        }
+      >
+        <option value="">To</option>
+        {users.map(u => (
+          <option key={u.id} value={u.id}>{u.name}</option>
+        ))}
+      </select>
 
-        <input
-          type="number"
-          placeholder="Amount"
-          value={data.amount || ""}
-          onChange={e =>
-            setData(prev => ({ ...prev, amount: +e.target.value }))
-          }
-        />
+      <input
+        type="number"
+        placeholder="Amount"
+        onChange={e =>
+          setData({ ...data, amount: +e.target.value })
+        }
+      />
 
-        {/* 🔥 Explicit button type prevents GET requests */}
-        <button type="button" onClick={submit}>
-          Settle
-        </button>
-      </div>
+      <button onClick={submit}>Settle</button>
 
       {error && (
         <p style={{ color: "red", marginTop: "8px" }}>
-          ❌ {error}
+           {error}
         </p>
       )}
     </div>
