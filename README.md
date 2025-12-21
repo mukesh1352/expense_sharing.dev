@@ -1,4 +1,9 @@
 ![Go](https://img.shields.io/badge/Go-1.22+-00ADD8?style=for-the-badge&logo=go&logoColor=white)
+![Docker](https://img.shields.io/badge/docker-%230db7ed.svg?style=for-the-badge&logo=docker&logoColor=white)
+![TypeScript](https://img.shields.io/badge/typescript-%23007ACC.svg?style=for-the-badge&logo=typescript&logoColor=white)
+![TailwindCSS](https://img.shields.io/badge/tailwindcss-%2338B2AC.svg?style=for-the-badge&logo=tailwind-css&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/postgresql-%23336791.svg?style=for-the-badge&logo=postgresql&logoColor=white)
+
 
 # Expense Sharing System
 
@@ -273,6 +278,7 @@ Executes a sequence of database operations within a single transaction.
 - Begins a database transaction
 - Commits on success
 - Rolls back automatically on error
+- Helps in the denial of the race condition by using the rollback and commit protocols.
 
 **Why it exists:**
 All financial operations must be **atomic**. Partial updates could corrupt
@@ -296,8 +302,6 @@ Creates a new expense and updates the ledger accordingly.
 5. Updates balances using ledger core logic
 6. Commits atomically
 
-**Important Note:**
-This function does not move money. It only creates **financial obligations**.
 
 ---
 
