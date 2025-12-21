@@ -1,31 +1,30 @@
-# --build stage----
-FROM golang:1.22-alphine AS builder
+# ---------- Build Stage ----------
+FROM golang:1.22-alpine AS builder
 
 WORKDIR /app
 
-# Installing git
+# Install git (for go modules)
 RUN apk add --no-cache git
 
-#Copy the golang files -> for caching
+# Copy go mod files first (better caching)
 COPY go.mod go.sum ./
 RUN go mod download
 
-# Copy the remaining files
+# Copy the rest of the source
 COPY . .
 
-# Build the binary file
-
+# Build the binary
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o server main.go
 
-# -------- Runtime Stage --------
+# ---------- Runtime Stage ----------
 FROM alpine:3.19
 
 WORKDIR /app
 
-# Create a non-root user (security best practice)
+# Create non-root user (security best practice)
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Copy binary from builder
+# Copy binary from build stage
 COPY --from=builder /app/server .
 
 # Change ownership
@@ -33,7 +32,7 @@ RUN chown -R appuser:appgroup /app
 
 USER appuser
 
-# Expose API port
+# Render sets PORT automatically
 EXPOSE 8080
 
 # Start server
