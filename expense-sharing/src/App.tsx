@@ -1,35 +1,31 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { useState } from "react";
+import Users from "./components/Users";
+import Groups from "./components/Groups";
+import CreateExpense from "./components/CreateExpense";
+import UserBalances from "./components/UserBalances";
+import GroupBalances from "./components/GroupBalances";
+import SettleBalance from "./components/SettleBalance";
 
-function App() {
-  const [count, setCount] = useState(0)
+export default function App() {
+  const [refreshKey, setRefreshKey] = useState(0);
+
+  const triggerRefresh = () => {
+    setRefreshKey(k => k + 1);
+  };
 
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
-}
+    <div style={{ padding: 24 }}>
+      <h1>Splitwise Clone</h1>
 
-export default App
+      <Users />
+      <Groups />
+
+      <CreateExpense onSuccess={triggerRefresh} />
+
+      <UserBalances refreshKey={refreshKey} />
+      <GroupBalances refreshKey={refreshKey} />
+
+      <SettleBalance onSuccess={triggerRefresh} />
+    </div>
+  );
+}
