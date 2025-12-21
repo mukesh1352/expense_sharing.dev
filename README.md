@@ -679,6 +679,19 @@ The backend server will start on:
 ```
 http://localhost:8080
 ```
+## Testing
+
+Unit tests are focused on the **core ledger logic**, including split
+calculation and balance netting. Infrastructure and HTTP layers are kept
+thin and are therefore not unit-tested.
+
+To run tests locally:
+
+```bash
+cd backend
+go test ./...
+```
+
 
 ---
 
