@@ -8,7 +8,7 @@
 # Expense Sharing System
 
 This project is a **backend-first service** that implements a centralized
-expense-sharing ledger inspired by Splitwise.
+expense-sharing ledger.
 
 It allows users to create groups, add shared expenses, track who owes whom,
 and settle outstanding dues. The primary focus of this project is **financial
