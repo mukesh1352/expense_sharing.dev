@@ -583,6 +583,14 @@ Returns all balances between members of a specific group.
 
 ---
 
+## 📹 Demo Video
+
+Click below to see a quick walkthrough of the working system:
+
+👉 https://youtu.be/SZMQfjcUIss
+
+[![Demo Video](https://img.youtube.com/vi/SZMQfjcUIss/0.jpg)](https://youtu.be/SZMQfjcUIss)
+
 ## Running the Project Locally
 
 This project is designed as a **backend-first system** with a simple frontend
