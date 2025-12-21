@@ -102,6 +102,19 @@ serve distinct roles in tracking obligations and settlements.
 
 ---
 
+## Database Schema Management
+The database schema is managed using the SQL migration files which are located in the `backend/db/migrations` directory.
+
+Each of the migration files defines a particular part of the database schema, such as the tables, its respective relations and the constraints required by the ledger system.
+
+Migrations are applied **outside of the application runtime** and are not
+executed by the backend service itself.
+This enures that :
+ - The application does not modify the schema in production.
+ - Schema changes are modified and auditable.
+ - No race conditions occur.
+ - For clear understanding of the data model and the architecture.
+
 ## Balance Model
 
 The system maintains a **directional balance ledger** where each entry
