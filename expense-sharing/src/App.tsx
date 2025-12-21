@@ -14,18 +14,47 @@ export default function App() {
   };
 
   return (
-    <div style={{ padding: 24 }}>
-      <h1>Splitwise Clone</h1>
+    <div className="min-h-screen bg-gray-100 py-10 px-4">
+      <div className="max-w-5xl mx-auto space-y-8">
+        
+        {/* Header */}
+        <h1 className="text-4xl font-bold text-center text-gray-800">
+          Expense Ledger
+        </h1>
 
-      <Users />
-      <Groups />
+        {/* Users & Groups */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-2xl shadow p-6">
+            <Users />
+          </div>
 
-      <CreateExpense onSuccess={triggerRefresh} />
+          <div className="bg-white rounded-2xl shadow p-6">
+            <Groups />
+          </div>
+        </div>
 
-      <UserBalances refreshKey={refreshKey} />
-      <GroupBalances refreshKey={refreshKey} />
+        {/* Create Expense */}
+        <div className="bg-white rounded-2xl shadow p-6">
+          <CreateExpense onSuccess={triggerRefresh} />
+        </div>
 
-      <SettleBalance onSuccess={triggerRefresh} />
+        {/* Balances */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-2xl shadow p-6">
+            <UserBalances refreshKey={refreshKey} />
+          </div>
+
+          <div className="bg-white rounded-2xl shadow p-6">
+            <GroupBalances refreshKey={refreshKey} />
+          </div>
+        </div>
+
+        {/* Settle Balance */}
+        <div className="bg-white rounded-2xl shadow p-6">
+          <SettleBalance onSuccess={triggerRefresh} />
+        </div>
+
+      </div>
     </div>
   );
 }
